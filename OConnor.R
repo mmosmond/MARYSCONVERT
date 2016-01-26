@@ -107,10 +107,14 @@ rownames(empPCFdf)<-1:nrow(empPCFdf)
 colnames(empPCFdf)<-c("distance","PCF")
 
 #model fitting
-empPCFdf[empPCFdf$distance == 0,] <- NA #remove rows with distance of zero because this breaks the bessel function
-m <- nls(PCF ~ 1 + 1/(2*pi) * (ro/lambda)^2 * besselK(abs(distance/lambda), 0), data = empPCFdf[-1,], start = list(ro = 10000, lambda = 50000), trace = T) #take absolute value because with made up data nls looks for negative lambda, which breaks bessel (set lower bounds somehow?)
+empPCFdf <- empPCFdf[which(empPCFdf$distance != 0),] #remove rows with distance of zero because this breaks the bessel function
+m <- nls(PCF ~ 1 + 1/(2*pi) * (ro/lambda) * besselK(abs(distance/lambda), 0), data = empPCFdf, start = list(ro = 10000, lambda = 50000), trace = T) #take absolute value because with made up data nls looks for negative lambda, which breaks bessel (set lower bounds somehow?)
 #m <- nls(y ~ 1 + 1/(2*pi) * (ro/lambda) * besselK(x/lambda, 0), data = df, start = list(ro = 10000, lambda = 50000), trace = T, lower = list(0, 0))
 
 summary(m) #parameter estimates
 plot(empPCFdf) #data
 lines(empPCFdf$distance ,predict(m)) #fitted curve
+
+install.packages("propagate")
+library(propagate)
+	⁃	predictNLS(m, newdata = data.frame(	distance = 2))
