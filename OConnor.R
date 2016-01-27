@@ -5,6 +5,10 @@ df1<-Abundance.df
 ### Patrick's data is given as abundances in each patch of a 20x20 grid. The R code below (based on the Mathematica package from Azaele, 2015) does not use this type of abundance data - the number of rows for each species in a "plot" (grid cell) is used as the number of counts in that plot. We can replicate each row according to the abundance column to make the data fit the format required for the package. 
 library(splitstackshape)
 df<-expandRows(df1,"Abundance")
+# some rows are removed because the species is absent. These species are removed as factors. 
+df$Species<-droplevels(df$Species)
+###Note, Patrick's data gives the y coordinate in the first column and x coordinate in the second column. The grid is 20*20 so this doesn't matter in this case. 
+
 
 ############### Plot Dimensions
 #here the dimensions of the ecosystem area are inputted.
@@ -91,7 +95,7 @@ dataset<-data.frame(x,y)
 dataset<-dataset[-1,]
 
 #model often doesn't converge well enough. 
-modelfit<-nls(y ~ 1+ (1/(2*pi)) * ((ro/lambda)^2) * besselK(x/lambda,0), data=dataset, start=list(ro=10,lambda=1),control=list(minFactor = 1/1024,warnOnly=FALSE))
+modelfit<-nls(y ~ 1+(1/(2*pi)) * ((ro/lambda)^2) * besselK(x/lambda,0), data=dataset, start=list(ro=10,lambda=1),control=list(minFactor = 1/1024,warnOnly=FALSE))
 
 foo<-summary(modelfit)
 params<-c(foo$parameters[1,1],foo$parameters[2,1])
@@ -99,7 +103,7 @@ roEst<-params[1]
 lamEst<-params[2]
 
 gFunc<-function(x,ro,lambda){
-	1 + (1/(2*pi)) * ((ro/lambda)^2) * besselK(x/lambda,0)
+	 1+(1/(2*pi)) * ((ro/lambda)^2) * besselK(x/lambda,0)
 }
 plot(empPCFdf)
 lines(seq(1,100,by=0.25),sapply(seq(1,100,by=0.25),function(x)(gFunc(x, roEst, lamEst))))
@@ -129,7 +133,6 @@ SAR<-function(r,ro,lambda){
 }
 
 plot(SAR(1:14,roEst,lamEst),xlab="Radius (m) of sampled area",ylab="Mean number of species")
-
 
 #Downscaled SAD at radius r when all the information in the study region is available. The largest scale is Lx*Ly. Here r<sqrt((Lx*Ly)/pi)
 SAD<-function(n,r,ro,lambda){
