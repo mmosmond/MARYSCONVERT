@@ -10,12 +10,33 @@ df$Species<-droplevels(df$Species)
 ###Note, Patrick's data gives the y coordinate in the first column and x coordinate in the second column. The grid is 20*20 so this doesn't matter in this case. 
 
 
+############### Import Robin's data:
+df1<-read.csv("~/Downloads/sbc_fish_2010.csv")
+head(df1)
+max(df1$Latitude)
+min(df1$Latitude)
+max(df1$Longitude)
+min(df1$Longitude)
+
+library(splitstackshape)
+df2<-expandRows(df1,"Abundance")
+
+df3<-df2[,6:7]
+df3$SpeciesName<-as.factor(with(df2,paste(Genus,Species)))
+nrow(df3)
+df3$Latitude<-(df3$Latitude-min(df1$Latitude))*10+0.01
+df3$Longitude<-(df3$Longitude-min(df1$Longitude))*10+0.01
+df<-df3
+
+plot(df[,1:2])
+
+
 ############### Plot Dimensions
 #here the dimensions of the ecosystem area are inputted.
-Lx<-20
-Ly<-20
+Lx<-4.5
+Ly<-8
 #Here the area of the plots is inputted. This number gives the level of resolution of the analysis. You need to choose a resolution so to have enough statistics and at the same time reduces the noise. The output of the PCF gives you an idea of this trade off: you need to have a n>30 points and not too noisy
-Asub<-2
+Asub<-0.5
 ###NOTE THAT Lx/Asub should be an integer, otherwise some plots will extend over the edge of the area or be lost. 
 
 ################ summary information
@@ -78,8 +99,14 @@ CovFunc<-function(i,poslist1,poslist2){
 	mean(SabA(i,poslist1)*SabA(i,poslist2))/(mean(SabA(i,poslist1))*mean(SabA(i,poslist2)))
 }
 allpair$allcov<-sapply(1:nrow(allpair),function(x)(CovFunc(x,allpair$possub1,allpair$possub2)))
+sapply(1:50,function(x)(CovFunc(x,allpair$possub1,allpair$possub2)))
+
+### because there are some grid cells with no data, I simply omit these rows from allpair. 
+allpair<-na.omit(allpair)
 
 ###Take the mean covariance for each distance between plots
+allpair$alldist<-droplevels(allpair$alldist)
+rvec<-levels(allpair$alldist)
 empPCF<-tapply(allpair$allcov,allpair$alldist,mean)
 #put the PCF values and their distances in a data frame with appropriate columns
 empPCFdf<-data.frame(as.numeric(rvec)*Asub,as.numeric(empPCF))
@@ -95,7 +122,7 @@ dataset<-data.frame(x,y)
 dataset<-dataset[-1,]
 
 #model often doesn't converge well enough. 
-modelfit<-nls(y ~ 1+(1/(2*pi)) * ((ro/lambda)^2) * besselK(x/lambda,0), data=dataset, start=list(ro=10,lambda=1),control=list(minFactor = 1/1024,warnOnly=FALSE))
+modelfit<-nls(y ~ 1+(1/(2*pi)) * ((ro/lambda)^2) * besselK(x/lambda,0), data=dataset, start=list(ro=50,lambda=1),control=list(minFactor = 1/1024,warnOnly=FALSE,maxiter=200))
 
 foo<-summary(modelfit)
 params<-c(foo$parameters[1,1],foo$parameters[2,1])
@@ -106,7 +133,9 @@ gFunc<-function(x,ro,lambda){
 	 1+(1/(2*pi)) * ((ro/lambda)^2) * besselK(x/lambda,0)
 }
 plot(empPCFdf)
-lines(seq(1,100,by=0.25),sapply(seq(1,100,by=0.25),function(x)(gFunc(x, roEst, lamEst))))
+lines(seq(0,20,by=0.01),sapply(seq(0,20,by=0.01),function(x)(gFunc(x, roEst, lamEst))))
+
+empPCFdf
 
 #number of individuals in each plot
 ind<-sapply(1:nplot,function(x)(sum(SabA(x,allpos$possub)))) 
@@ -132,7 +161,14 @@ SAR<-function(r,ro,lambda){
 	NSpecies*(sarmedp(r,ro,lambda))/(sarmedp(sqrt((Lx*Ly)/pi),ro,lambda))
 }
 
-plot(SAR(1:14,roEst,lamEst),xlab="Radius (m) of sampled area",ylab="Mean number of species")
+plot(SAR(1:14,roEst,lamEst),xlab="Radius (0.1 lat-long coordinates, not corrected) of sampled area",ylab="Mean number of species")
+
+upSAR<-function(r,ro,lambda){
+	NSpecies*(sarmedp(r,ro,lambda))/(sarmedp(sqrt((20*0.1)/pi),ro,lambda))
+}
+
+plot(upSAR(1:14,roEst,lamEst),xlab="Radius (0.1 lat-long coordinates, not corrected) of sampled area",ylab="Mean number of species")
+
 
 #Downscaled SAD at radius r when all the information in the study region is available. The largest scale is Lx*Ly. Here r<sqrt((Lx*Ly)/pi)
 SAD<-function(n,r,ro,lambda){
